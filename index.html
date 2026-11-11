@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>모민재의 8-BIT 레트로 아케이드</title>
+    <!-- 구글 레트로 폰트 (Press Start 2P & Diphylleia) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Galmuri10:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==================== Reset & Color Variables ==================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        :root {
+            --bg-dark: #0a051b;
+            --bg-card: #160a33;
+            --neon-pink: #ff007f;
+            --neon-cyan: #00f3ff;
+            --neon-yellow: #ffe600;
+            --neon-green: #00ff66;
+            --neon-purple: #9d00ff;
+            --pixel-white: #ffffff;
+            --text-gray: #a09cb0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--pixel-white);
+            font-family: 'Galmuri10', 'Press Start 2P', monospace, sans-serif;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+            padding-bottom: 50px;
+            /* 레트로 격자 배경 */
+            background-image: 
+                linear-gradient(rgba(255, 0, 127, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 0, 127, 0.08) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+
+        /* Scanline CRT 효과 */
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            z-index: 999;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* 캔버스 (마우스 트레일 & 이펙트) */
+        #trailCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 998;
+        }
+
+        /* Container Layout */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Common Retro Pixel Box */
+        .pixel-box {
+            background: var(--bg-card);
+            border: 4px solid var(--neon-cyan);
+            box-shadow: 
+                0 0 0 4px #000,
+                0 0 15px rgba(0, 243, 255, 0.4),
+                inset 0 0 10px rgba(0, 243, 255, 0.2);
+            padding: 20px;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            color: var(--neon-yellow);
+            text-shadow: 2px 2px 0px #000, 0 0 8px var(--neon-yellow);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ==================== Header Section ==================== */
+        header {
+            text-align: center;
+            padding: 30px 10px 10px;
+        }
+
+        .sub-header {
+            font-size: 0.85rem;
+            color: var(--neon-cyan);
+            letter-spacing: 2px;
+            text-shadow: 0 0 5px var(--neon-cyan);
+            margin-bottom: 12px;
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        /* 통통 튀는 별명 애니메이션 */
+        .bouncing-nickname {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--neon-pink);
+            text-shadow: 3px 3px 0px #000, -2px -2px 0px var(--neon-yellow), 0 0 15px var(--neon-pink);
+            margin: 10px 0;
+        }
+
+        .bouncing-nickname span {
+            display: inline-block;
+            animation: pixelBounce 0.8s infinite alternate ease-in-out;
+        }
+
+        /* 각 글자별 키프레임 딜레이 */
+        .bouncing-nickname span:nth-child(1) { animation-delay: 0.0s; }
+        .bouncing-nickname span:nth-child(2) { animation-delay: 0.15s; }
+        .bouncing-nickname span:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes pixelBounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-16px); }
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #000;
+            border: 2px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            box-shadow: 0 0 8px var(--neon-green);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ==================== Cards Section (Favorite Things) ==================== */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .flip-card {
+            background-color: transparent;
+            height: 220px;
+            perspective: 1000px;
+            cursor: pointer;
+        }
+
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            box-sizing: border-box;
+            border: 3px solid var(--neon-purple);
+            box-shadow: 0 0 10px rgba(157, 0, 255, 0.4);
+        }
+
+        .card-front {
+            background: linear-gradient(135deg, #180938 0%, #0d0520 100%);
+        }
+
+        .card-front .icon {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+        }
+
+        .card-front .card-title {
+            font-size: 1.2rem;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px var(--neon-cyan);
+        }
+
+        .card-front .tap-hint {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+            margin-top: 12px;
+        }
+
+        .card-back {
+            background: linear-gradient(135deg, #2a0845 0%, #16002c 100%);
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 12px rgba(255, 0, 127, 0.5);
+            transform: rotateY(180deg);
+        }
+
+        .card-back .reason-title {
+            font-size: 1rem;
+            color: var(--neon-yellow);
+            margin-bottom: 10px;
+            border-bottom: 2px dashed var(--neon-yellow);
+            padding-bottom: 4px;
+        }
+
+        .card-back .reason-desc {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: var(--pixel-white);
+            word-break: keep-all;
+        }
+
+        /* ==================== Quiz Section ==================== */
+        .quiz-container {
+            text-align: center;
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+        }
+
+        .quiz-question {
+            font-size: 1.2rem;
+            margin: 15px 0 25px;
+            color: #fff;
+            text-shadow: 0 0 6px #fff;
+            word-break: keep-all;
+        }
+
+        .quiz-btns {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .retro-btn {
+            background: #000;
+            color: var(--neon-cyan);
+            border: 3px solid var(--neon-cyan);
+            font-family: inherit;
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding: 12px 30px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px var(--neon-cyan);
+            transition: all 0.1s ease;
+            position: relative;
+            outline: none;
+        }
+
+        .retro-btn:active {
+            transform: translate(3px, 3px);
+            box-shadow: 1px 1px 0px var(--neon-cyan);
+        }
+
+        .retro-btn.btn-pink {
+            color: var(--neon-pink);
+            border-color: var(--neon-pink);
+            box-shadow: 4px 4px 0px var(--neon-pink);
+        }
+        .retro-btn.btn-pink:active {
+            box-shadow: 1px 1px 0px var(--neon-pink);
+        }
+
+        .quiz-result {
+            margin-top: 20px;
+            font-size: 1.1rem;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        /* 화면 흔들림 애니메이션 */
+        .shake-screen {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+            40%, 60% { transform: translate3d(8px, 0, 0); }
+        }
+
+        /* ==================== Fortune Section ==================== */
+        .fortune-container {
+            text-align: center;
+            border-color: var(--neon-yellow);
+            box-shadow: 0 0 15px rgba(255, 230, 0, 0.3);
+        }
+
+        .fortune-display {
+            background: #000;
+            border: 2px dashed var(--neon-yellow);
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+            color: var(--neon-yellow);
+            line-height: 1.6;
+            word-break: keep-all;
+            text-shadow: 0 0 5px var(--neon-yellow);
+        }
+
+        /* ==================== Mash Mini Game Section ==================== */
+        .game-container {
+            text-align: center;
+            border-color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.3);
+        }
+
+        .game-stats {
+            display: flex;
+            justify-content: space-around;
+            background: #000;
+            border: 2px solid var(--neon-green);
+            padding: 12px;
+            margin: 16px 0;
+            font-size: 0.95rem;
+        }
+
+        .stat-item span {
+            color: var(--neon-green);
+            font-weight: bold;
+        }
+
+        .mash-btn-area {
+            margin: 20px 0;
+        }
+
+        .mash-btn {
+            width: 100%;
+            max-width: 320px;
+            height: 90px;
+            font-size: 1.4rem;
+            color: #000;
+            background: var(--neon-green);
+            border: 4px solid #fff;
+            box-shadow: 0 6px 0 #009933, 0 0 15px var(--neon-green);
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 8px;
+            transition: transform 0.05s ease;
+        }
+
+        .mash-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #009933, 0 0 15px var(--neon-green);
+        }
+
+        .mash-btn:disabled {
+            background: #444;
+            color: #888;
+            border-color: #666;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .high-score {
+            font-size: 0.85rem;
+            color: var(--neon-cyan);
+            margin-top: 8px;
+        }
+
+        /* ==================== Responsive Style ==================== */
+        @media (max-width: 600px) {
+            .container {
+                padding: 12px;
+                gap: 20px;
+            }
+            .bouncing-nickname {
+                font-size: 2.2rem;
+            }
+            .section-title {
+                font-size: 1.1rem;
+            }
+            .retro-btn {
+                padding: 10px 20px;
+                font-size: 1.1rem;
+            }
+            .mash-btn {
+                height: 80px;
+                font-size: 1.2rem;
+            }
+            .flip-card {
+                height: 190px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 마우스 / 터치 입자 애니메이션 Canvas -->
+    <canvas id="trailCanvas"></canvas>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="sub-header">★ PLAYER 1 INTRO ★</div>
+            <div class="bouncing-nickname">
+                <span>모</span><span>민</span><span>재</span>
+            </div>
+            <div>
+                <span class="status-badge">PRESS START TO EXPLORE</span>
+            </div>
+        </header>
+
+        <!-- 3가지 좋아하는 것 (Flip Cards) -->
+        <section class="pixel-box">
+            <h2 class="section-title">🎮 FAVORITE THINGS (3)</h2>
+            <div class="cards-grid">
+                <!-- Card 1: 게임 -->
+                <div class="flip-card" onclick="flipCard(this)">
+                    <div class="flip-card-inner">
+                        <div class="card-front">
+                            <div class="icon">🕹️</div>
+                            <div class="card-title">게임</div>
+                            <div class="tap-hint">[터치해서 이유 보기]</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="reason-title">왜 좋을까?</div>
+                            <div class="reason-desc">현실에는 없는 세이브 포인트가 있고, 만렙을 찍으면 세상을 구하는 주인공이 될 수 있으니까!</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: 잠 -->
+                <div class="flip-card" onclick="flipCard(this)">
+                    <div class="flip-card-inner">
+                        <div class="card-front">
+                            <div class="icon">🛌</div>
+                            <div class="card-title">잠</div>
+                            <div class="tap-hint">[터치해서 이유 보기]</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="reason-title">왜 좋을까?</div>
+                            <div class="reason-desc">체력을 100% 무료로 완충해 주는 유일한 HP 회복 아이템! 꿈속에서는 내가 신임.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: 치킨 -->
+                <div class="flip-card" onclick="flipCard(this)">
+                    <div class="flip-card-inner">
+                        <div class="card-front">
+                            <div class="icon">🍗</div>
+                            <div class="card-title">치킨</div>
+                            <div class="tap-hint">[터치해서 이유 보기]</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="reason-title">왜 좋을까?</div>
+                            <div class="reason-desc">바삭한 튀김옷 한 입 물면 스트레스 버프가 깔끔하게 해제됨. 1인 1닭은 인생의 진리!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- OX 퀴즈 -->
+        <section class="pixel-box quiz-container" id="quizSection">
+            <h2 class="section-title" style="justify-content: center;">❓ RETRO OX QUIZ</h2>
+            <div class="quiz-question">"모민재는 현재 여자친구가 있다?"</div>
+            <div class="quiz-btns">
+                <button class="retro-btn btn-pink" onclick="checkQuiz('O')">O</button>
+                <button class="retro-btn" onclick="checkQuiz('X')">X</button>
+            </div>
+            <div class="quiz-result" id="quizResult">버튼을 눌러 정답을 맞혀보세요!</div>
+        </section>
+
+        <!-- 오늘의 운세 -->
+        <section class="pixel-box fortune-container">
+            <h2 class="section-title" style="justify-content: center;">🔮 TODAY'S FORTUNE</h2>
+            <p style="font-size: 0.85rem; color: var(--text-gray);">오늘 나의 8비트 아케이드 운세는?</p>
+            <div class="fortune-display" id="fortuneDisplay">
+                [운세 뽑기] 버튼을 누르면 8비트 운세가 공개됩니다!
+            </div>
+            <button class="retro-btn btn-pink" onclick="getRandomFortune()">운세 뽑기 🎲</button>
+        </section>
+
+        <!-- 10초 광클 연타 미니게임 -->
+        <section class="pixel-box game-container">
+            <h2 class="section-title" style="justify-content: center;">⚡ 10초 연타 왕! (MINI GAME)</h2>
+            <p style="font-size: 0.85rem; color: var(--text-gray); margin-bottom: 12px;">10초 동안 최대한 빠르게 버튼을 연타하세요!</p>
+            
+            <div class="game-stats">
+                <div class="stat-item">남은 시간: <span id="timerDisplay">10.0</span>s</div>
+                <div class="stat-item">클릭 수: <span id="clickDisplay">0</span>회</div>
+            </div>
+
+            <div class="mash-btn-area">
+                <button class="mash-btn" id="mashBtn" onclick="handleMashClick()">GAME START!</button>
+            </div>
+
+            <div class="high-score" id="highScoreDisplay">🏆 최고 기록: 0회</div>
+            <div id="gameRankResult" style="margin-top: 10px; font-weight: bold; min-height: 24px; color: var(--neon-yellow);"></div>
+        </section>
+    </div>
+
+    <script>
+        /* ==================== 1. 카드 뒤집기 (Flip Cards) ==================== */
+        function flipCard(cardElement) {
+            cardElement.classList.toggle('flipped');
+        }
+
+        /* ==================== 2. OX 퀴즈 시스템 ==================== */
+        function checkQuiz(answer) {
+            const resultBox = document.getElementById('quizResult');
+            const quizSection = document.getElementById('quizSection');
+
+            if (answer === 'X') {
+                // 정답 (X)
+                resultBox.style.background = 'rgba(0, 255, 102, 0.2)';
+                resultBox.style.color = 'var(--neon-green)';
+                resultBox.style.border = '2px solid var(--neon-green)';
+                resultBox.innerHTML = '🎉 STAGE CLEAR! 정답입니다! (슬프지만 솔로버프 유지 중...)';
+                
+                // 축하 픽셀 입자 폭발
+                createParticles(window.innerWidth / 2, window.innerHeight / 2, 50, ['#00ff66', '#00f3ff', '#ffe600', '#ff007f']);
+            } else {
+                // 오답 (O)
+                resultBox.style.background = 'rgba(255, 0, 127, 0.2)';
+                resultBox.style.color = 'var(--neon-pink)';
+                resultBox.style.border = '2px solid var(--neon-pink)';
+                resultBox.innerHTML = '💀 GAME OVER! 땡! 틀렸습니다. 눈물 좀 닦고 올게요...';
+
+                // 화면 흔들림 효과
+                quizSection.classList.remove('shake-screen');
+                void quizSection.offsetWidth; // reflow
+                quizSection.classList.add('shake-screen');
+            }
+        }
+
+        /* ==================== 3. 오늘의 운세 (12가지 랜덤) ==================== */
+        const fortunes = [
+            "🍗 오늘 야식으로 치킨을 시키면 닭다리가 3개 들어있을 엄청난 운세!",
+            "🎮 오늘 플레이하는 모든 게임에서 연속 5연승 버프를 획득합니다!",
+            "🛌 이불 속에서 나가면 위험합니다. 오늘은 침대 위가 절대 안전지대!",
+            "✨ 길을 걷다가 주머니에서 잊고 있던 1,000원짜리 지폐를 발견할 운세!",
+            "⚡ 오늘 당신의 순발력이 +100 상승합니다. 연타 게임에 도전하세요!",
+            "🍕 좋아하는 음식을 먹어도 칼로리가 0kcal로 적용되는 신비한 날!",
+            "☕ 오늘 마시는 음료수가 평소보다 2배 더 달콤하고 맛있게 느껴집니다.",
+            "🔋 만성 피로 해소! 오늘 밤 잠들면 레벨업과 함께 HP/MP가 완전 회복됩니다.",
+            "🎁 뜻밖의 인물이 당신에게 맛있는 선물을 건네줄 기분 좋은 날!",
+            "🎯 의심 없이 고른 선택지가 모두 정답으로 이어지는 럭키 데이!",
+            "🤖 오늘 만나는 모든 버그와 에러가 알아서 고쳐지는 마법 같은 날!",
+            "🏆 당신의 매력 지수가 상승하여 주변 사람들의 호감을 얻게 됩니다!"
+        ];
+
+        function getRandomFortune() {
+            const display = document.getElementById('fortuneDisplay');
+            // 텍스트 깜빡이 효과 후 출력
+            display.style.opacity = '0.3';
+            setTimeout(() => {
+                const randomIndex = Math.floor(Math.random() * fortunes.length);
+                display.innerText = fortunes[randomIndex];
+                display.style.opacity = '1';
+            }, 150);
+        }
+
+        /* ==================== 4. 10초 광클 연타 미니게임 ==================== */
+        let gameCount = 0;
+        let timeLeft = 10.0;
+        let gameTimer = null;
+        let isGaming = false;
+        let highScore = localStorage.getItem('minjae_mash_highscore') || 0;
+
+        // 최고 기록 표시 초기화
+        document.getElementById('highScoreDisplay').innerText = `🏆 최고 기록: ${highScore}회`;
+
+        function handleMashClick() {
+            const mashBtn = document.getElementById('mashBtn');
+            const clickDisplay = document.getElementById('clickDisplay');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const rankResult = document.getElementById('gameRankResult');
+
+            if (!isGaming && timeLeft === 10.0) {
+                // 게임 시작
+                isGaming = true;
+                gameCount = 1;
+                clickDisplay.innerText = gameCount;
+                mashBtn.innerText = 'CLICK! CLICK!';
+                rankResult.innerText = '';
+
+                let startTime = Date.now();
+                gameTimer = setInterval(() => {
+                    let elapsed = (Date.now() - startTime) / 1000;
+                    timeLeft = Math.max(0, (10 - elapsed)).toFixed(1);
+                    timerDisplay.innerText = timeLeft;
+
+                    if (timeLeft <= 0) {
+                        // 게임 종료
+                        clearInterval(gameTimer);
+                        endGame();
+                    }
+                }, 50);
+            } else if (isGaming) {
+                // 게임 진행 중 연타
+                gameCount++;
+                clickDisplay.innerText = gameCount;
+
+                // 클릭 시 입자 효과
+                const rect = mashBtn.getBoundingClientRect();
+                createParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 3, ['#00ff66', '#ffffff']);
+            }
+        }
+
+        function endGame() {
+            isGaming = false;
+            const mashBtn = document.getElementById('mashBtn');
+            const rankResult = document.getElementById('gameRankResult');
+
+            mashBtn.innerText = 'RETRY? (다시하기)';
+            
+            // 최고 기록 갱신 여부
+            if (gameCount > highScore) {
+                highScore = gameCount;
+                localStorage.setItem('minjae_mash_highscore', highScore);
+                document.getElementById('highScoreDisplay').innerText = `🏆 최고 기록: ${highScore}회 (NEW!)`;
+            }
+
+            // 칭호 산정
+            let rank = "";
+            if (gameCount >= 80) rank = "👑 [신] 광속의 손가락 마스터!";
+            else if (gameCount >= 60) rank = "⚡ [보스급] 오락실을 패배시킨 자!";
+            else if (gameCount >= 40) rank = "🔥 [고수] 손가락에 엔진 달았음!";
+            else if (gameCount >= 20) rank = "👍 [보통] 평범함 속에 잠재된 힘!";
+            else rank = "🐢 [거북이] 좀 더 빠르게 눌러보세요!";
+
+            rankResult.innerText = `최종 기록: ${gameCount}회 - ${rank}`;
+            
+            // 축하 이펙트
+            createParticles(window.innerWidth / 2, window.innerHeight / 2, 30, ['#00ff66', '#ffe600']);
+
+            // 버튼 잠시 대기 후 리셋 가능하게 함
+            mashBtn.disabled = true;
+            setTimeout(() => {
+                mashBtn.disabled = false;
+                timeLeft = 10.0;
+                document.getElementById('timerDisplay').innerText = '10.0';
+            }, 1000);
+        }
+
+        /* ==================== 5. 마우스/터치 반짝이 이펙트 (Canvas) ==================== */
+        const canvas = document.getElementById('trailCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let particles = [];
+
+        class Particle {
+            constructor(x, y, color = null) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 6 + 3; // 픽셀 크기
+                this.speedX = (Math.random() - 0.5) * 4;
+                this.speedY = (Math.random() - 0.5) * 4;
+                const colors = ['#ff007f', '#00f3ff', '#ffe600', '#00ff66', '#ffffff'];
+                this.color = color || colors[Math.floor(Math.random() * colors.length)];
+                this.life = 1.0; // 투명도
+                this.decay = Math.random() * 0.03 + 0.02;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.life -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                // 네모난 8비트 픽셀 모양
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        // 입자 생성 함수
+        function createParticles(x, y, count = 5, customColors = null) {
+            for (let i = 0; i < count; i++) {
+                let color = customColors ? customColors[Math.floor(Math.random() * customColors.length)] : null;
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // 마우스 / 터치 이동 이벤트
+        window.addEventListener('mousemove', (e) => {
+            createParticles(e.clientX, e.clientY, 2);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                createParticles(e.touches[0].clientX, e.touches[0].clientY, 2);
+            }
+        }, { passive: true });
+
+        // 애니메이션 루프
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+
+                if (particles[i].life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animateParticles);
+        }
+
+        // 루프 실행
+        animateParticles();
+    </script>
+</body>
+</html>
